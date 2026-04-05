@@ -1,0 +1,10 @@
+services:
+  jupyter:
+    build: .
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/home/jovyan/work
+    environment:
+      - SPARK_DRIVER_MEMORY=4g
+      - JUPYTER_ENABLE_LAB=yes
