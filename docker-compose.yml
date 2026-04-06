@@ -1,6 +1,8 @@
 services:
   jupyter:
     build: .
+    image: mf810-project
+    container_name: mf810-project
     ports:
       - "8888:8888"
     volumes:

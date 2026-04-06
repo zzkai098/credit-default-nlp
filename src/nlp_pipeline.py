@@ -19,6 +19,8 @@ def clean_text(text):
     if pd.isna(text) or text == "":
         return ""
     text = re.sub(r"<[^>]+>", " ", str(text))  # remove HTML tags
+    text = re.sub(r"(?i)borrower added on \d{2}/\d{2}/\d{2}\s*>?", "", text)  # remove system template
+    text = re.sub(r"\d{6}\s*added on \d{2}/\d{2}/\d{2}\s*>?", "", text)  # remove ID template
     text = text.lower()
     text = re.sub(r"[^a-z\s]", "", text)  # keep only letters
     tokens = text.split()
