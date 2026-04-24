@@ -1,19 +1,29 @@
 """Spark session management and Parquet I/O utilities."""
 
+import os
 from pyspark.sql import SparkSession, DataFrame
 
 
-def get_spark_session(app_name="MF810_CreditDefault", memory="4g"):
-    """Create and return a SparkSession configured for local mode."""
+def get_spark_session(app_name="MF810_CreditDefault", memory=None):
+    """Create and return a SparkSession configured for local mode.
+
+    Memory resolution: explicit arg > SPARK_DRIVER_MEMORY env var > "4g".
+    """
+    if memory is None:
+        memory = os.environ.get("SPARK_DRIVER_MEMORY", "4g")
+
     spark = (
         SparkSession.builder
         .appName(app_name)
         .master("local[*]")
         .config("spark.driver.memory", memory)
+        .config("spark.driver.maxResultSize", "2g")
         .config("spark.sql.parquet.compression.codec", "snappy")
+        .config("spark.sql.shuffle.partitions", "100")
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("WARN")
+    print(f"Spark driver memory: {memory}")
     return spark
 
 

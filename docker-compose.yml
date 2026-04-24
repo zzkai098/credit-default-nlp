@@ -8,5 +8,5 @@ services:
     volumes:
       - .:/home/jovyan/work
     environment:
-      - SPARK_DRIVER_MEMORY=4g
+      - SPARK_DRIVER_MEMORY=7g
       - JUPYTER_ENABLE_LAB=yes

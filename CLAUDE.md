@@ -96,3 +96,166 @@ Expected Loss framework: `EL = PD x EAD x LGD`
 - Data manipulation (2 pts): Grammar-based manipulation or SQL
 - Evaluation & visualization (3 pts): Algorithm justification, plots (time-series, scatter, histograms)
 - Code must run and recreate results in Docker, well-documented environment
+
+## NLP Feature Engineering Reference
+
+Techniques learned from Questrom NLP Deep Learning workshop, adapted for credit default prediction.
+
+### Constraint: PySpark + MLlib Only
+
+All processing and model training must use PySpark and MLlib (big data modules). No scikit-learn for model training. Use `pyspark.ml` pipeline API throughout.
+
+### Approach 1: TF-IDF + Logistic Regression (Baseline NLP)
+
+This is the simplest NLP approach and already planned in Step 5.
+
+```
+Text fields (desc, title, emp_title)
+  → Preprocessing: lowercase, remove HTML/stopwords, lemmatization (UDF or pyspark.sql.functions)
+  → pyspark.ml.feature.Tokenizer or RegexTokenizer
+  → pyspark.ml.feature.StopWordsRemover
+  → pyspark.ml.feature.HashingTF + pyspark.ml.feature.IDF (TF-IDF)
+  → Feed into pyspark.ml.classification.LogisticRegression
+```
+
+PySpark TF-IDF pipeline:
+```python
+from pyspark.ml.feature import RegexTokenizer, StopWordsRemover, HashingTF, IDF
+from pyspark.ml.classification import LogisticRegression
+from pyspark.ml import Pipeline
+
+tokenizer = RegexTokenizer(inputCol="desc_clean", outputCol="words", pattern="\\W")
+remover = StopWordsRemover(inputCol="words", outputCol="filtered")
+hashingTF = HashingTF(inputCol="filtered", outputCol="rawFeatures", numFeatures=5000)
+idf = IDF(inputCol="rawFeatures", outputCol="tfidf_features")
+lr = LogisticRegression(featuresCol="tfidf_features", labelCol="default")
+
+pipeline = Pipeline(stages=[tokenizer, remover, hashingTF, idf, lr])
+model = pipeline.fit(train_df)
+```
+
+Key parameters:
+- `numFeatures=5000`: HashingTF hashes words into 5000 buckets (equivalent to max_features in sklearn)
+- `StopWordsRemover`: built-in English stopwords list
+- No need for custom lemmatizer — RegexTokenizer + StopWordsRemover is sufficient for PySpark
+
+### Approach 2: Word2Vec Mean Vector + Logistic Regression (Semantic NLP)
+
+TF-IDF treats each word independently — "struggling" and "difficulty" are completely different dimensions. Word2Vec captures semantic similarity.
+
+MLlib has built-in Word2Vec:
+```python
+from pyspark.ml.feature import Word2Vec
+
+# Train Word2Vec on Lending Club text corpus
+word2vec = Word2Vec(vectorSize=50, minCount=10, inputCol="filtered", outputCol="w2v_features")
+w2v_model = word2vec.fit(df)
+# Automatically outputs mean vector per document (no manual averaging needed)
+df_w2v = w2v_model.transform(df)
+```
+
+MLlib Word2Vec automatically averages word vectors per document — no need to manually compute mean.
+
+Combine with TF-IDF using VectorAssembler:
+```python
+from pyspark.ml.feature import VectorAssembler
+
+assembler = VectorAssembler(
+    inputCols=["tfidf_features", "w2v_features", "structured_features"],
+    outputCol="all_features"
+)
+lr = LogisticRegression(featuresCol="all_features", labelCol="default")
+```
+
+Key parameters:
+- `vectorSize=50`: each word → 50-dim vector
+- `minCount=10`: ignore words appearing fewer than 10 times
+- MLlib Word2Vec uses Skip-Gram internally
+
+### Approach 3: Knowledge Base Sentence Extraction + Deep Learning (Advanced)
+
+For long text fields like `desc`, most content is noise. Extract only default-relevant sentences first.
+
+**Step 1: Build default risk knowledge base**
+```
+Seed words (manual): ['default', 'missed', 'late', 'payment', 'delinquent',
+                       'overdue', 'bankrupt', 'deferred', 'collection']
+→ Use Word2Vec to auto-expand with nearest neighbors
+→ Knowledge base: {default, missed, late, struggling, arrears, unpaid, ...}
+```
+
+**Step 2: Score and extract sentences**
+```
+Distance method: cosine distance between sentence vector centroid and knowledge base centroid
+Match method: count intersection of sentence words with knowledge base
+→ Keep top N most relevant sentences per borrower
+```
+
+**Step 3: Feed into MLlib classifier**
+```
+Extracted sentences
+  → RegexTokenizer → StopWordsRemover → HashingTF + IDF
+  → VectorAssembler (combine with structured features)
+  → LogisticRegression or GBTClassifier or RandomForestClassifier (MLlib)
+```
+
+Note: MLlib does not have CNN/LSTM. For deep learning within PySpark, options are limited.
+The practical approach is: use knowledge base extraction to boost signal, then classify with MLlib models.
+
+```python
+from pyspark.ml.classification import GBTClassifier, RandomForestClassifier
+
+# GBT often outperforms Logistic Regression on mixed features
+gbt = GBTClassifier(featuresCol="all_features", labelCol="default", maxIter=50)
+```
+
+### NLP Pipeline: Three-Stage Comparison
+
+The NLP pipeline progresses from traditional statistics to deep learning. Each stage builds on the previous. Detailed implementation steps follow the Questrom NLP Deep Learning workshop notebook (`/Users/yishanranxin./Desktop/NLP/NLP_app/NLP_Deep_Learning_Questrom_WS_03_2020.ipynb`).
+
+**Stage 1: TF-IDF → Logistic Regression (MLlib)**
+```
+text → PySpark HashingTF + IDF → 5000-dim sparse vector
+     → LogisticRegression (MLlib)
+     → baseline AUC
+```
+Pure word frequency signal. No semantic understanding.
+
+**Stage 2: TF-IDF + Word2Vec → Logistic Regression (MLlib)**
+```
+text → TF-IDF (5000-dim) + Word2Vec mean (50-dim)
+     → VectorAssembler → combined 5050-dim vector
+     → LogisticRegression (MLlib)
+     → compare AUC vs Stage 1
+```
+Adds semantic features. "struggling" and "difficulty" now contribute similarly.
+
+**Stage 3: Word2Vec Embedding → CNN/BiLSTM (TensorFlow)**
+```
+text → PySpark preprocessing (tokenize, clean, pad sequences)
+     → collect() to numpy
+     → Embedding layer (Word2Vec or GloVe)
+     → CNN (local word group patterns) or BiLSTM (sequence understanding)
+     → Dense(1, sigmoid) → default probability
+     → compare AUC vs Stage 1 & 2
+```
+Understands word order and context. "not defaulting" vs "defaulting" are distinguished.
+
+**Final comparison table in report:**
+| Stage | Features | Model | Framework | AUC |
+|-------|----------|-------|-----------|-----|
+| 1 | TF-IDF | LR | MLlib | ? |
+| 2 | TF-IDF + Word2Vec | LR | MLlib | ? |
+| 3 | Word2Vec Embedding | CNN/BiLSTM | TensorFlow | ? |
+
+Each stage demonstrates a clear methodological advancement.
+
+### Practical Notes
+
+- `desc` has 94% missing — for Word2Vec/sentence extraction, only use non-missing subset or combine with `title` field
+- PySpark Pipeline handles train/test split correctly — `pipeline.fit(train)` then `model.transform(test)` avoids data leakage
+- For Word2Vec: cosine distance measures semantic similarity (direction matters, not magnitude)
+- MLlib NaiveBayes is a fast alternative classifier — assumes word independence, just counts word frequencies per class
+- All MLlib classifiers work with Pipeline API — chain tokenizer → TF-IDF → assembler → classifier in one pipeline
+- Use `pyspark.ml.evaluation.BinaryClassificationEvaluator` for AUC, `MulticlassClassificationEvaluator` for accuracy/F1
+- Use `pyspark.ml.tuning.CrossValidator` or `TrainValidationSplit` for hyperparameter tuning (equivalent to sklearn GridSearchCV)
