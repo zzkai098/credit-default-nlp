@@ -1,0 +1,30 @@
+{
+  "stage1_tfidf_lr": {
+    "auc": 0.583,
+    "gini": 0.1661
+  },
+  "stage2_w2v_lr": {
+    "auc": 0.5752,
+    "gini": 0.1503
+  },
+  "stage2c_combined": {
+    "auc": 0.5845,
+    "gini": 0.169
+  },
+  "stage3_match3": {
+    "auc": 0.5709,
+    "gini": 0.1417
+  },
+  "stage3_match2": {
+    "auc": 0.572,
+    "gini": 0.1441
+  },
+  "stage3_dist2": {
+    "auc": 0.567,
+    "gini": 0.134
+  },
+  "stage4_cnn": {
+    "auc": 0.587,
+    "gini": 0.174
+  }
+}
