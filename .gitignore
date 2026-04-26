@@ -1,5 +1,4 @@
 data/raw/*.csv
-data/parquet/*
 !data/parquet/.gitkeep
 .ipynb_checkpoints/
 __pycache__/

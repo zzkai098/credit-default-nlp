@@ -875,7 +875,7 @@ def get_pd_coarse_classing_specs() -> list[dict[str, Any]]:
         {"name": "installment", "candidates": ["installment"], "feature_type": "continuous", "n_initial_bins": 30},
         # 4) Continuous variables with criteria
         {"name": "annual_inc", "candidates": ["annual_inc"], "feature_type": "continuous", "n_initial_bins": 40, "enforce_monotonic": True},
-        {"name": "dti_factor", "candidates": ["dti", "dti_factor"], "feature_type": "continuous", "n_initial_bins": 40, "enforce_monotonic": True},
+        {"name": "dti", "candidates": ["dti", "dti_factor"], "feature_type": "continuous", "n_initial_bins": 40, "enforce_monotonic": True},
         {"name": "mths_since_last_delinq", "candidates": ["mths_since_last_delinq"], "feature_type": "continuous", "n_initial_bins": 30},
         {"name": "mths_since_last_record", "candidates": ["mths_since_last_record"], "feature_type": "continuous", "n_initial_bins": 30},
     ]
@@ -936,6 +936,37 @@ def fit_pd_coarse_classing(
     )
     return train_out, test_out, pipelines, reports, name_mapping, missing
 
+DF_FEATURES = [
+    # Discrete variables
+    "id",
+    "grade",
+    "home_ownership",
+    "addr_state",
+    "verification_status",
+    "purpose",
+    "initial_list_status",
+
+    # Continuous / numeric variables
+    "term_int",
+    "emp_length_int",
+    "delinq_2yrs",
+    "inq_last_6mths",
+    "open_acc",
+    "pub_rec",
+    "acc_now_delinq",
+    "mths_since_issue_d",
+    "int_rate",
+    "funded_amnt",
+    "mths_since_earliest_cr_line",
+    "total_acc",
+    "total_rev_hi_lim",
+    "installment",
+    "annual_inc",
+    "dti",
+    "mths_since_last_delinq",
+    "mths_since_last_record",
+    "good_bad",
+]
 
 __all__ = [
     "build_woe_iv_table",
