@@ -938,7 +938,6 @@ def fit_pd_coarse_classing(
 
 DF_FEATURES = [
     # Discrete variables
-    "id",
     "grade",
     "home_ownership",
     "addr_state",
@@ -965,7 +964,6 @@ DF_FEATURES = [
     "dti",
     "mths_since_last_delinq",
     "mths_since_last_record",
-    "good_bad",
 ]
 
 __all__ = [
