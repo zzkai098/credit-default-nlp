@@ -150,6 +150,17 @@ def fit_mean_imputer(train_df: DataFrame, target_col: str) -> float:
 def apply_mean_imputer(df: DataFrame, target_col: str, mean_value: float) -> DataFrame:
     return df.fillna({target_col: mean_value})
 
+def apply_median_imputer(df: DataFrame, target_col: str, median_value: float) -> DataFrame:
+    return df.fillna({target_col: median_value})
+
+def fit_median_imputer(train_df: DataFrame, target_col: str) -> float:
+    median_value = (
+        train_df
+        .select(F.expr(f"percentile_approx({target_col}, 0.5)").alias("median_value"))
+        .collect()[0]["median_value"]
+    )
+    return median_value
+
 def fill_null_with_zero(df: DataFrame, columns: list[str]) -> DataFrame:
     fill_map = {c: 0 for c in columns if c in df.columns}
     return df.fillna(fill_map)
