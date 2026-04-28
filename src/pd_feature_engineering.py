@@ -225,6 +225,119 @@ def plot_by_woe(
     plt.tight_layout()
     plt.show()
 
+
+def plot_woe_history_compare(
+    pipeline: "SingleFeatureWOEPipeline",
+    *,
+    before_iter: int = 0,
+    after_iter: Optional[int] = None,
+    use_final_table: bool = True,
+    show_prop_n_obs: bool = False,
+    title: Optional[str] = None,
+    figsize: Tuple[int, int] = (14, 4),
+    rotate_xticks: int = 45,
+    sharey: bool = False,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Compare WoE before coarse-classing merges and after the final classing result.
+
+    `history_[0]["table"]` is the initial fine-classing table before any merge.
+    Prefer `final_table_` for the ending state, because `history_[-1]` may still
+    be an intermediate table from the last iteration before the final merge.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import PercentFormatter
+
+    if not getattr(pipeline, "history_", None):
+        raise RuntimeError("Pipeline history is empty. Call fit() first.")
+
+    if before_iter < 0 or before_iter >= len(pipeline.history_):
+        raise IndexError(f"before_iter={before_iter} is out of range for history_ length {len(pipeline.history_)}.")
+
+    before_table = pipeline.history_[before_iter]["table"].copy()
+
+    if use_final_table:
+        if pipeline.final_table_ is None:
+            raise RuntimeError("Pipeline final_table_ is empty. Call fit() first.")
+        after_table = pipeline.final_table_.copy()
+        after_label = "Final coarse classing"
+    else:
+        if after_iter is None:
+            after_iter = len(pipeline.history_) - 1
+        if after_iter < 0 or after_iter >= len(pipeline.history_):
+            raise IndexError(f"after_iter={after_iter} is out of range for history_ length {len(pipeline.history_)}.")
+        after_table = pipeline.history_[after_iter]["table"].copy()
+        after_label = f"History iter {after_iter}"
+
+    def _pretty_tick_label(label: str) -> str:
+        text = str(label)
+        if " | " in text:
+            return "\n".join(part.strip() for part in text.split(" | "))
+        return text
+
+    if figsize == (14, 4):
+        max_bins = max(len(before_table), len(after_table))
+        max_label_len = max(
+            max((len(str(x)) for x in before_table["bin"]), default=0),
+            max((len(str(x)) for x in after_table["bin"]), default=0),
+        )
+        auto_width = min(24, max(14, 10 + 0.22 * max_bins + 0.06 * max_label_len))
+        auto_height = 6 if (max_bins > 12 or max_label_len > 18) else 4
+        figsize = (auto_width, auto_height)
+
+    fig, axes = plt.subplots(1, 2, figsize=figsize, sharey=sharey)
+
+    for ax, plot_df, subtitle in (
+        (axes[0], before_table, f"Initial classing (iter {before_iter})"),
+        (axes[1], after_table, after_label),
+    ):
+        work = plot_df.copy()
+        work["bin"] = work["bin"].astype(str)
+        x = list(range(len(work)))
+        woe_line = ax.plot(x, work["WoE"], marker="o", color="tab:blue", label="WoE")
+        ax.set_xticks(x)
+        ax.set_xticklabels(
+            [_pretty_tick_label(x) for x in work["bin"]],
+            rotation=rotate_xticks,
+            ha="right",
+            fontsize=8 if len(work) > 15 else 10,
+        )
+        ax.set_xlabel("bin")
+        ax.set_ylabel("WoE", color="tab:blue")
+        ax.tick_params(axis="y", labelcolor="tab:blue")
+        ax.set_title(
+            f"{subtitle}\nIV={float(work['IV'].iloc[0]):.4f}" if not work.empty and "IV" in work.columns else subtitle
+        )
+        ax.grid(axis="y", alpha=0.25)
+
+        legend_lines = list(woe_line)
+        legend_labels = ["WoE"]
+
+        if show_prop_n_obs and "prop_n_obs" in work.columns:
+            ax_right = ax.twinx()
+            prop_line = ax_right.plot(
+                x,
+                work["prop_n_obs"],
+                marker="s",
+                linestyle="--",
+                color="tab:orange",
+                label="prop_n_obs",
+            )
+            ax_right.set_ylabel("prop_n_obs", color="tab:orange")
+            ax_right.tick_params(axis="y", labelcolor="tab:orange")
+            ax_right.yaxis.set_major_formatter(PercentFormatter(xmax=1.0))
+            legend_lines.extend(prop_line)
+            legend_labels.append("prop_n_obs")
+
+        ax.legend(legend_lines, legend_labels, loc="best")
+
+    fig.suptitle(title or f"WoE comparison: {pipeline.feature}")
+    fig.tight_layout()
+    plt.show()
+
+    return before_table, after_table
+
+
 def add_bin_indicator_columns(
     df: DataFrame,
     grp_col: str,
@@ -969,6 +1082,7 @@ DF_FEATURES = [
 __all__ = [
     "build_woe_iv_table",
     "plot_by_woe",
+    "plot_woe_history_compare",
     "SingleFeatureWOEPipeline",
     "fit_feature_pipelines",
     "get_pd_coarse_classing_specs",

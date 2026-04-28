@@ -14,6 +14,19 @@ DEFAULT_STATUSES = [
     "Does not meet the credit policy. Status:Charged Off",
 ]
 
+MISSING_COL = [
+    "total_rev_hi_lim",
+    "funded_amnt",
+    "annual_inc",
+    "mths_since_earliest_cr_line",
+    "acc_now_delinq",
+    "total_acc",
+    "pub_rec",
+    "open_acc",
+    "inq_last_6mths",
+    "delinq_2yrs",
+    "emp_length_int",
+]
 
 def _safe_name(value: str) -> str:
     """Convert a category value into a safe Spark column suffix."""
