@@ -30,8 +30,8 @@ There is no test suite; no linter is configured. Validation = run-all the notebo
 
 | Notebook | Purpose | Key outputs |
 |---|---|---|
-| `00_file_convert` | CSV → Parquet (one-shot, also done in 01) | `data/parquet/accepted_*.parquet` |
-| `01_data_loading` | Initial load + train/test split | `data/parquet/accepted_general_prep_{train,test}.parquet` |
+| `00_file_convert` | Decompress raw `.csv.gz` → `.csv` | `data/raw/accepted_*.csv`, `data/raw/rejected_*.csv` |
+| `01_data_loading` | CSV → Parquet, initial load, train/test split | `data/parquet/accepted_raw.parquet`, `data/parquet/accepted_general_prep_{train,test}.parquet` |
 | `02_general_prep` | EDA, missing-pattern analysis, cleanup | figures in `outputs/figures/` |
 | `03_feature_engineering` | WoE binning + IV-based selection on structured features | `data/parquet/features_pd_{train,test}.parquet`, `outputs/tables/woe_report_*.csv` |
 | `04_nlp_pipeline_dev` | TF-IDF + Word2Vec + CNN distillation, occupation clustering | `outputs/nlp_features_{train,test}.parquet`, `nlp_tfidf_*`, `nlp_w2v_*`, `outputs/models/{tfidf_model,w2v_model,cnn_model.h5}` |
