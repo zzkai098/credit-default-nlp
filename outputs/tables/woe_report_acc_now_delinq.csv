@@ -1,2 +1,2 @@
 __order__,bin,n_obs,prop_good,prop_n_obs,n_good,n_bad,prop_n_good,prop_n_bad,WoE,diff_prop_good,diff_WoE,IV_component,IV
-0,"(-inf, MISSING]",1809174,0.8713954545002305,1.0,1576506.0,232668.0,1.0,1.0,0.0,,,0.0,0.0
+1,"(0, inf]",1807770,0.8716141987089066,1.0,1575678.0,232092.0,1.0,1.0,0.0,,,0.0,0.0

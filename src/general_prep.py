@@ -28,13 +28,6 @@ MISSING_COL = [
     "emp_length_int",
 ]
 
-def _safe_name(value: str) -> str:
-    """Convert a category value into a safe Spark column suffix."""
-    text = "missing" if value is None else str(value).strip()
-    text = re.sub(r"[^0-9A-Za-z]+", "_", text)
-    text = re.sub(r"_+", "_", text).strip("_")
-    return text.lower() if text else "missing"
-
 def add_int_by_extracting_number(
     df: DataFrame,
     source_col: str,

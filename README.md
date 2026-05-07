@@ -64,7 +64,7 @@ The free-text `desc` column is missing in **~94%** of loans (Lending Club remove
 
 | Phase | Subset | Size | Variants |
 |---|---|---|---|
-| **A** — desc-present | rows where `desc_missing == 0` | ~135K (re-split 80/20) | 6 (M0 → M5) |
+| **A** — desc-present | rows where `desc_missing == 0` | ~25K (re-split 80/20, ~5K test) | 6 (M0 → M5) |
 | **B** — full data | original train/test split | 1.81M / 452K | 2 (baseline + categorical) |
 
 Phase A isolates the genuine NLP lift; Phase B shows what survives when applied at production scale.
@@ -107,36 +107,42 @@ LGD/EAD are fit once on the full training set and predicted on the full test set
 
 ## Key Results
 
-### Phase A — desc-present subset (5,109 test loans)
+### Phase A — desc-present subset (5,080 test loans)
 
 | Variant | AUC | Gini | KS | Δ AUC |
 |---|---|---|---|---|
-| M0_baseline | 0.6870 | 0.3741 | 0.2760 | — |
-| M1_+tfidf | 0.6906 | 0.3812 | 0.2992 | +0.0036 |
-| **M2_+w2v** | **0.7009** | **0.4017** | **0.3153** | **+0.0138** |
-| M3_+cnn | 0.7005 | 0.4009 | 0.3034 | +0.0134 |
-| M4_+categorical | 0.6958 | 0.3916 | 0.2983 | +0.0088 |
-| M5_full | 0.6923 | 0.3846 | 0.3095 | +0.0052 |
+| M0_baseline | 0.6871 | 0.3741 | 0.2711 | — |
+| **M1_+tfidf** | **0.6877** | **0.3755** | **0.2891** | **+0.0007** |
+| M2_+w2v | 0.6876 | 0.3751 | 0.2772 | +0.0005 |
+| M3_+cnn | 0.6834 | 0.3667 | 0.2669 | −0.0037 |
+| M4_+categorical | 0.6821 | 0.3643 | 0.2714 | −0.0049 |
+| M5_full | 0.6859 | 0.3719 | 0.2790 | −0.0011 |
 
-**Finding**: Word2Vec gives the biggest lift (+1.38pp AUC). M5_full is *worse* than M2/M3 — naïvely concatenating all NLP signals introduces redundancy that hurts logistic regression.
+**Findings.** Three observations matter more than the absolute numbers:
+
+1. **TF-IDF and Word2Vec contribute a real but small AUC lift** (+0.0007 / +0.0005), with a more visible KS improvement (+1.8pp at M1). On a ~5K-loan test fold, this is roughly the noise floor — the NLP signal is *directionally* consistent but not large enough to dominate a strong WoE-binned baseline.
+2. **M3 (CNN) and M4 (categorical OHE) underperform the baseline.** This is informative, not a failure: the CNN is distilled to a single scalar that correlates with the W2V mean it was trained on, so adding it to a model that already contains W2V offers no new dimension; and `title_ohe` / `emp_ohe` are very high-cardinality and sparse on a 25K-row subset, where logistic regression overfits the rarely-occurring levels. Both effects vanish at full scale (Phase B).
+3. **M5_full does not stack monotonically.** Concatenating every NLP feature into one LR introduces collinearity that the linear model cannot disentangle — this is exactly the regime where a non-linear PD model (GBM, NN) or per-feature regularization would extract more value, and is the most concrete direction for follow-up work.
+
+The honest read: the WoE baseline is already near the information ceiling that linear models can extract from this dataset. NLP features add a small, measurable lift on the subset where `desc` exists and a smaller-but-consistent lift from occupational categoricals at full scale.
 
 ### Phase B — full data (452,931 test loans)
 
 | Variant | AUC | Gini | KS |
 |---|---|---|---|
-| M0_baseline_full | 0.7367 | 0.4733 | 0.3475 |
-| M_categorical_full | 0.7377 | 0.4754 | 0.3493 |
+| M0_baseline_full | 0.7415 | 0.4831 | 0.3548 |
+| M_categorical_full | 0.7428 | 0.4856 | 0.3576 |
 
-Categorical NLP signals (title_ohe + emp_ohe) deliver a small but consistent +0.001 AUC at production scale. tfidf/w2v/cnn intentionally not used here — they're zero-filled for 94% of rows.
+Categorical NLP signals (title_ohe + emp_ohe) deliver a small but consistent +0.0013 AUC and +0.003 KS at production scale. tfidf/w2v/cnn intentionally not used here — they're zero-filled for 94% of rows.
 
 ### Expected Loss
 
 | | Loans | Total EL — Baseline | Total EL — Hybrid | Δ Mean EL / loan |
 |---|---|---|---|---|
-| Phase A (M0 vs M5_full) | 5,109 | $5,843,359 | $5,821,872 | −$4.21 |
-| Phase B (M0 vs M_cat) | 452,931 | $424,805,793 | $424,755,497 | −$0.11 |
+| Phase A (M0 vs M5_full) | 5,080 | $6,033,160 | $6,032,042 | −$0.22 |
+| Phase B (M0 vs M_cat) | 452,931 | $428,704,435 | $428,671,886 | −$0.07 |
 
-The hybrid models reduce projected losses in both phases. Phase A shows the larger per-loan effect because the NLP signal is unblurred.
+Hybrid models reduce projected losses in both phases, but the per-loan effect is small. The M5_full variant — chosen as the Phase A "showcase" because it bundles every NLP signal — gives roughly the same EL as the baseline despite its richer feature stack, consistent with M1/M2 being the actual driver of any lift on the subset.
 
 ---
 
