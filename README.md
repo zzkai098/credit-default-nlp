@@ -169,7 +169,40 @@ Descriptive text analysis that motivated the feature choices:
 
 ![Top TF-IDF terms](outputs/figures/tfidf_top_terms.png)
 ![TF-IDF terms: default vs non-default](outputs/figures/tfidf_default_comparison.png)
+
+### Occupation clustering — 411,809 job titles into 20 categories
+
+`emp_title` is free text with **512,693 distinct values** across the 2.26M-loan book — **411,809**
+after lowercasing and trimming — and is missing for only 7.4% of loans. That cardinality cannot be
+one-hot encoded, so the field is reduced through an unsupervised pipeline that turns free text into
+20 model-ready categories:
+
+```
+lower(trim(emp_title))  ->  RegexTokenizer  ->  StopWordsRemover
+                        ->  HashingTF(1000) ->  IDF
+                        ->  KMeans(k=20, seed=42)  ->  OneHotEncoder
+```
+
 ![Occupation cluster default rates](outputs/figures/occupation_cluster_default_rate.png)
+
+Default rates spread from **~9% (C8) to ~15.5% (C11)** against a **12.86%** book average. That ~6.5pp
+spread clears the ~5pp rule of thumb used to judge whether a categorical carries usable signal, which
+is why `emp_cluster` entered the PD model — and its measured incremental contribution was **+0.0013
+AUC**. The two facts are not in tension: **univariate separation and incremental lift are different
+questions**, and occupational information is already partly encoded in income, employment length and
+grade.
+
+**The honest caveat.** Cluster C0 absorbs **1,342,072 rows (74.2%)**, leaving 465,698 spread across
+the other 19 — which do form clean semantic groups (sales/management, technical, healthcare/education,
+skilled trades, public sector). C0 is **not** mainly a missing-value artefact: `emp_title` is missing
+for only 7.4% of loans, which accounts for at most 7 of those 74 points. The real cause is that job
+titles are one-to-three-word strings, so hashing them into 1,000 dimensions leaves vectors too sparse
+for Euclidean K-means to separate. Replacing hashed TF-IDF with Word2Vec or sentence embeddings, or
+mapping onto a standard occupation taxonomy, is the right next attempt.
+
+The `title` field (borrower-stated loan purpose, ~99.5% present) needed no clustering — its top 20
+normalised values already cover ~95% of loans, so it is bucketed top-20-plus-`other` and one-hot encoded:
+
 ![Loan-title default rates](outputs/figures/title_default_rate.png)
 
 ---
